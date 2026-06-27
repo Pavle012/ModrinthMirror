@@ -1,0 +1,106 @@
+# =============================================================================
+# Modrinth Upstream Mirror - example configuration
+# Copy this to config.yaml and edit the values for your pack/repo.
+# =============================================================================
+
+modrinth:
+  # Slug or ID of the modpack project, e.g. "assembly-line-smp" or "AbCd1234"
+  project: "your-pack-slug-or-id"
+
+  # Modrinth requires a descriptive User-Agent on API requests.
+  # Format: github_username/project_name/version (contact_email_or_url)
+  user_agent: "yourgithub/modpack-mirror/1.0 (you@example.com)"
+
+  api_base_url: "https://api.modrinth.com/v2"
+
+  filters:
+    # Only mirror versions matching these. Empty list = no filter on that field.
+    loaders: ["neoforge"]          # e.g. forge, fabric, neoforge, quilt
+    game_versions: ["1.21.1"]
+    version_types: ["release"]     # release | beta | alpha
+    featured_only: false
+
+  request_timeout_seconds: 30
+  max_retries: 5
+  retry_backoff_seconds: 2.0
+
+repo:
+  # Local path to the git repo. Created automatically if it doesn't exist.
+  path: "./my-pack-fork"
+
+  # If set and `path` doesn't exist yet, this is cloned instead of `git init`.
+  remote_url: null                 # e.g. "git@github.com:you/my-pack-fork.git"
+  remote_name: "origin"
+
+  # Branch that only ever contains mirrored upstream commits.
+  mirror_branch: "upstream"
+
+  # If true (default) and the mirror branch doesn't exist yet, it's created as
+  # an orphan branch (no shared history with main) so the upstream timeline
+  # stays completely separate from your own commits. Recommended: leave true.
+  create_orphan_mirror_branch: true
+
+  push_after_mirror: false         # git push after mirroring new versions
+
+  # Leave null to use your global `git config user.name` / `user.email`.
+  git_user_name: null
+  git_user_email: null
+
+  # Files/dirs on the mirror branch that are NEVER deleted when a new
+  # upstream version is extracted. Glob patterns or path prefixes.
+  preserve_paths:
+    - ".github/"
+    - "README.md"
+    - "MIRROR_NOTES.md"
+
+  tag_versions: true
+  tag_prefix: "upstream-"
+
+extraction:
+  # full          = overrides/ contents + modrinth.index.json (mod list, etc.)
+  # overrides_only = just the overrides/ contents (configs, resource packs...)
+  mode: "full"
+  clean_before_extract: true       # wipe non-preserved files before each extract
+  keep_modrinth_index: true        # only used when mode == full
+
+state:
+  # Tracks which upstream version IDs have already been mirrored, so reruns
+  # are incremental. Strongly recommended to keep this in the repo so it
+  # survives across machines/CI runs.
+  file: ".mirror_state.json"
+  store_in_repo: true
+
+commit:
+  # Available placeholders: {version_number} {version_name} {version_id}
+  # {version_type} {date} {changelog} {project}
+  message_template: "Upstream {version_number} ({version_type})\n\n{changelog}"
+  author_name: null                # overrides commit author if set
+  author_email: null
+
+run:
+  max_versions_per_run: 0          # 0 = unlimited (mirror everything new)
+  confirm_destructive: true        # prompt before mirroring (skip with --yes)
+
+merge:
+  # If enabled, after mirroring new commits onto `repo.mirror_branch`, attempt
+  # to merge/rebase them into `target_branch` (your working branch).
+  enabled: false
+  target_branch: "main"
+  strategy: "merge"                # merge | rebase
+  on_conflict: "abort"              # abort: roll back cleanly | leave: leave conflicted for manual fix
+
+notifications:
+  # Get pinged when new upstream versions are mirrored (and especially when a
+  # merge conflict needs your attention).
+  enabled: false
+  method: "github_issue"           # github_issue | webhook
+  github:
+    repo: "yourname/yourrepo"
+    token_env_var: "GITHUB_TOKEN"  # env var holding a token with `issues:write`
+    labels: ["upstream-update"]
+  webhook:
+    url: null                      # POSTs {versions:[...], conflict: bool}
+
+logging:
+  level: "INFO"                    # DEBUG | INFO | WARNING | ERROR
+  file: null                       # null = stdout only, or e.g. "mirror.log"
